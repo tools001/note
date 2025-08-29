@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Three.js Sorting Visualizer — Simple</title>
+  <style>
+    body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background:#0f172a; color:#e2e8f0; }
+    .ui { position: fixed; inset: 0 auto auto 0; padding: 12px; display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    .panel { background: #111827aa; border:1px solid #334155; border-radius: 12px; padding: 10px 12px; backdrop-filter: blur(8px); }
+    label { font-size: 12px; color:#cbd5e1; margin-right:4px; }
+    select, input[type="range"], button { appearance: none; border:1px solid #334155; background:#0b1220; color:#e2e8f0; border-radius: 8px; padding:6px 8px; }
+    input[type="range"] { height: 22px; }
+    button { cursor: pointer; }
+    button.primary { background:#0ea5e9; color:#0b1220; border: none; font-weight:600; }
+    .legend { position: fixed; right: 12px; top: 12px; }
+    .legend div { font-size: 12px; color:#cbd5e1; }
+    .legend span { display:inline-block; width:12px; height:12px; border-radius:2px; margin-right:6px; vertical-align: -2px; }
+    .timer { position: fixed; left: 50%; top: 12px; transform: translateX(-50%); background:#111827aa; border:1px solid #334155; border-radius:12px; padding:6px 12px; font-size:14px; }
+  </style>
+</head>
+<body>
+  <div class="ui">
+    <div class="panel">
+      <label>アルゴリズム</label>
+      <select id="algo">
+        <option value="quick">Quick Sort</option>
+        <option value="merge">Merge Sort</option>
+        <option value="insertion">Insertion Sort</option>
+        <option value="selection">Selection Sort</option>
+        <option value="bubble">Bubble Sort</option>
+      </select>
+    </div>
+    <div class="panel">
+      <label>要素数 <span id="sizeLabel">40</span></label>
+      <input type="range" id="size" min="10" max="150" value="40" />
+    </div>
+    <div class="panel">
+      <label>速度 <span id="speedLabel">50</span></label>
+      <input type="range" id="speed" min="1" max="100" value="50" />
+    </div>
+    <div class="panel" style="display:flex; gap:8px;">
+      <button id="regen">ランダム生成</button>
+      <button id="run" class="primary">実行</button>
+      <button id="stop">停止</button>
+    </div>
+  </div>
+
+  <div class="legend panel">
+    <div><span style="background:#10b981"></span>比較中</div>
+    <div><span style="background:#a78bfa"></span>ピボット</div>
+    <div><span style="background:#38bdf8"></span>マージ範囲</div>
+  </div>
+
+  <div id="timer" class="timer">⏱ 実行時間: 0.00s</div>
+
+  <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+  <script>
+    // ====== 基本セットアップ ======
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0b1220);
+
+    const camera = new THREE.PerspectiveCamera(55, window.innerWidth/window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 40, 80);
+    camera.lookAt(0, 0, 0);
+
+    const renderer = new THREE.WebGLRenderer({ antialias:true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+    document.body.appendChild(renderer.domElement);
+
+    const light1 = new THREE.DirectionalLight(0xffffff, 1.2);
+    light1.position.set(20, 40, 30);
+    scene.add(light1);
+    const light2 = new THREE.AmbientLight(0xffffff, 0.3);
+    scene.add(light2);
+
+    const groundGeo = new THREE.PlaneGeometry(400, 200);
+    const groundMat = new THREE.MeshStandardMaterial({ color: 0x0b1220, metalness:0.1, roughness:0.9, side: THREE.DoubleSide });
+    const ground = new THREE.Mesh(groundGeo, groundMat);
+    ground.rotation.x = -Math.PI/2;
+    ground.position.y = -0.01;
+    scene.add(ground);
+
+    // ====== データ／バー生成 ======
+    let values = [];
+    let bars = [];
+    let running = false;
+    let cancelRun = false;
+
+    // バー高さの縮小率（値そのままだと高すぎるため）
+    const scaleFactor = 0.2;
+
+    const palette = {
+      normal: new THREE.Color('#475569'),   // slate-600
+      compare: new THREE.Color('#10b981'),  // emerald-500
+      pivot: new THREE.Color('#a78bfa'),    // violet-400
+      merged: new THREE.Color('#38bdf8'),   // sky-400
+    };
+
+    const boxGeo = new THREE.BoxGeometry(1, 1, 1);
+
+    function generateValues(n=40) {
+      values = Array.from({length:n}, () => Math.floor(Math.random()*100)+5);
+    }
+
+    function clearBars() {
+      for (const m of bars) scene.remove(m);
+      bars = [];
+    }
+
+    function createBars() {
+      clearBars();
+      const n = values.length;
+      const spacing = 1.6;
+      const totalW = (n-1)*spacing;
+      const startX = -totalW/2;
+
+      for (let i=0;i<n;i++){
+        const h = values[i];
+        const mat = new THREE.MeshStandardMaterial({ color: palette.normal, metalness: 0.2, roughness: 0.5 });
+        const mesh = new THREE.Mesh(boxGeo, mat);
+        mesh.position.set(startX + i*spacing, (h * scaleFactor) / 2, 0);
+        mesh.scale.set(1, h * scaleFactor, 1);
+        mesh.castShadow = false;
+        mesh.receiveShadow = false;
+        scene.add(mesh);
+        bars.push(mesh);
+      }
+    }
+
+    function updateBars(step){
+      const { array, i, j, pivotIndex, mergedRange } = step;
+      const n = array.length;
+      const spacing = 1.6;
+      const totalW = (n-1)*spacing;
+      const startX = -totalW/2;
+
+      for (let k=0;k<n;k++){
+        const h = array[k];
+        const mesh = bars[k];
+        if (!mesh) continue;
+        mesh.position.x = startX + k*spacing;
+        mesh.scale.y = h * scaleFactor;
+        mesh.position.y = (h * scaleFactor) / 2;
+
+        const m = mesh.material;
+        if (k === pivotIndex) {
+          m.color.copy(palette.pivot);
+        } else if (k === i || k === j) {
+          m.color.copy(palette.compare);
+        } else if (mergedRange && k >= mergedRange[0] && k <= mergedRange[1]) {
+          m.color.copy(palette.merged);
+        } else {
+          m.color.copy(palette.normal);
+        }
+      }
+    }
+
+    // ====== ソート・ステップジェネレータ ======
+    function* bubbleSort(arr){
+      const a = arr.slice();
+      const n = a.length;
+      for (let i=0;i<n-1;i++){
+        for (let j=0;j<n-i-1;j++){
+          yield { array:a.slice(), i:j, j:j+1 };
+          if (a[j] > a[j+1]){ [a[j], a[j+1]] = [a[j+1], a[j]]; yield { array:a.slice(), i:j, j:j+1 }; }
+        }
+      }
+      yield { array:a.slice() };
+    }
+
+    function* insertionSort(arr){
+      const a = arr.slice();
+      for (let i=1;i<a.length;i++){
+        let key=a[i], j=i-1;
+        while(j>=0 && a[j]>key){ a[j+1]=a[j]; yield { array:a.slice(), i:j, j:j+1 }; j--; }
+        a[j+1]=key; yield { array:a.slice(), i:j+1 };
+      }
+      yield { array:a.slice() };
+    }
+
+    function* selectionSort(arr){
+      const a = arr.slice();
+      for (let i=0;i<a.length-1;i++){
+        let min=i;
+        for (let j=i+1;j<a.length;j++){ yield { array:a.slice(), i, j }; if (a[j]<a[min]) min=j; }
+        if (min!==i){ [a[i],a[min]]=[a[min],a[i]]; yield { array:a.slice(), i, j:min }; }
+      }
+      yield { array:a.slice() };
+    }
+
+    function* mergeSort(arr){
+      let a = arr.slice();
+      const n = a.length;
+      for (let size=1; size<n; size*=2){
+        for (let left=0; left<n-1; left+=2*size){
+          const mid = Math.min(left+size-1, n-1);
+          const right = Math.min(left+2*size-1, n-1);
+          const L = a.slice(left, mid+1), R = a.slice(mid+1, right+1);
+          let i=0,j=0,k=left;
+          while(i<L.length && j<R.length){ a[k++] = (L[i]<=R[j]) ? L[i++] : R[j++]; yield { array:a.slice(), mergedRange:[left,right] } }
+          while(i<L.length){ a[k++]=L[i++]; yield { array:a.slice(), mergedRange:[left,right] } }
+          while(j<R.length){ a[k++]=R[j++]; yield { array:a.slice(), mergedRange:[left,right] } }
+        }
+      }
+      yield { array:a.slice() };
+    }
+
+    function* quickSort(arr){
+      const a = arr.slice();
+      const st = [[0, a.length-1]];
+      while(st.length){
+        const [lo,hi] = st.pop();
+        if (lo>=hi) continue;
+        const pivot = a[hi];
+        let i=lo;
+        for (let j=lo;j<hi;j++){
+          yield { array:a.slice(), i:j, j:hi, pivotIndex:hi };
+          if (a[j] < pivot){ [a[i],a[j]]=[a[j],a[i]]; i++; yield { array:a.slice(), i:i-1, j, pivotIndex:hi }; }
+        }
+        [a[i],a[hi]]=[a[hi],a[i]]; yield { array:a.slice(), i, pivotIndex:i };
+        st.push([lo, i-1]); st.push([i+1, hi]);
+      }
+      yield { array:a.slice() };
+    }
+
+    const SORTERS = {
+      bubble: bubbleSort,
+      insertion: insertionSort,
+      selection: selectionSort,
+      merge: mergeSort,
+      quick: quickSort,
+    };
+
+    // ====== アニメーション実行 ======
+    let stepIterator = null;
+    let stepDelay = 30; // ms
+    let startTime = null;
+
+    async function runSort(algo){
+      if (running) return;
+      running = true; cancelRun = false;
+      stepIterator = SORTERS[algo](values);
+      startTime = performance.now();
+      for (const step of stepIterator){
+        if (cancelRun) break;
+        updateBars(step);
+        await new Promise(r=>setTimeout(r, stepDelay));
+      }
+      const endTime = performance.now();
+      const elapsed = ((endTime - startTime)/1000).toFixed(2);
+      document.getElementById('timer').textContent = `⏱ 実行時間: ${elapsed}s`;
+      running = false; cancelRun = false; stepIterator = null;
+    }
+
+    // ====== UI ======
+    const algoSel = document.getElementById('algo');
+    const sizeRange = document.getElementById('size');
+    const speedRange = document.getElementById('speed');
+    const sizeLabel = document.getElementById('sizeLabel');
+    const speedLabel = document.getElementById('speedLabel');
+    const regenBtn = document.getElementById('regen');
+    const runBtn = document.getElementById('run');
+    const stopBtn = document.getElementById('stop');
+
+    function regenerate(){ generateValues(parseInt(sizeRange.value,10)); createBars(); updateBars({ array: values.slice() }); document.getElementById('timer').textContent = "⏱ 実行時間: 0.00s"; }
+
+    sizeRange.addEventListener('input', ()=>{ sizeLabel.textContent = sizeRange.value; if (!running) regenerate(); });
+    speedRange.addEventListener('input', ()=>{ speedLabel.textContent = speedRange.value; stepDelay = Math.max(1, 101 - parseInt(speedRange.value,10)); });
+    regenBtn.addEventListener('click', ()=>{ if (!running) regenerate(); });
+    runBtn.addEventListener('click', ()=> runSort(algoSel.value));
+    stopBtn.addEventListener('click', ()=>{ cancelRun = true; });
+
+    // 初期化
+    regenerate();
+
+    // ====== render loop ======
+    function onResize(){
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+    window.addEventListener('resize', onResize);
+
+    renderer.setAnimationLoop(()=>{ renderer.render(scene, camera); });
+  </script>
+</body>
+</html>
