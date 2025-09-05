@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
 Project: 避暑地への扉 — ノベルゲー風プロトタイプ
-Author: <Your Name>
+Author: <Cody@IT-journey>
 Year: 2025
 Demo: https://<YOUR-USERNAME>.github.io/<REPO-NAME>/
 License: MIT（see LICENSE）
@@ -30,9 +30,9 @@ Notes:
 <meta property="og:description" content="生成AI×単一HTMLで小説をノベルゲーム風に動かした最短プロトタイプ。">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://tools001.github.io/note/001-tobira-v2/">
-<meta property="og:image" content="https://tools001.github.io/note/001-tobira-v2/ogp.png">
-<meta property="og:image:secure_url" content="https://tools001.github.io/note/001-tobira-v2/ogp.png">
-<meta property="og:image:type" content="image/png">
+<meta property="og:image" content="https://tools001.github.io/note/001-tobira-v2/ogp.jpg">
+<meta property="og:image:secure_url" content="https://tools001.github.io/note/001-tobira-v2/ogp.jpg">
+<meta property="og:image:type" content="image/jpeg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:locale" content="ja_JP">
@@ -40,7 +40,7 @@ Notes:
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="避暑地への扉 — ノベルゲー風プロトタイプ">
 <meta name="twitter:description" content="生成AI×単一HTMLで小説をノベルゲーム風に動かした最短プロトタイプ。">
-<meta name="twitter:image" content="https://tools001.github.io/note/001-tobira-v2/ogp.png">
+<meta name="twitter:image" content="https://tools001.github.io/note/001-tobira-v2/ogp.jpg">
 <link rel="canonical" href="https://tools001.github.io/note/001-tobira-v2/">
 <!-- OGP / Twitter Card : ここまで -->
 <style>
@@ -177,10 +177,10 @@ ground.rotation.x = -Math.PI/2; ground.receiveShadow = true; scene.add(ground);
 
 // テクスチャローダ
 const texLoader = new THREE.TextureLoader();
-const streetBgTex   = texLoader.load('machi.png',     (t)=>{ t.encoding=THREE.sRGBEncoding; t.minFilter=THREE.LinearFilter; });
-const highlandBgTex = texLoader.load('hisyochi.png',  (t)=>{ t.encoding=THREE.sRGBEncoding; t.minFilter=THREE.LinearFilter; });
-const nightBgTex    = texLoader.load('hisyochi1.png', (t)=>{ t.encoding=THREE.sRGBEncoding; t.minFilter=THREE.LinearFilter; });
-const descentBgTex  = texLoader.load('hisyochi2.png', (t)=>{ t.encoding=THREE.sRGBEncoding; t.minFilter=THREE.LinearFilter; });
+const streetBgTex   = texLoader.load('machi.jpg',     (t)=>{ t.encoding=THREE.sRGBEncoding; t.minFilter=THREE.LinearFilter; });
+const highlandBgTex = texLoader.load('hisyochi.jpg',  (t)=>{ t.encoding=THREE.sRGBEncoding; t.minFilter=THREE.LinearFilter; });
+const nightBgTex    = texLoader.load('hisyochi1.jpg', (t)=>{ t.encoding=THREE.sRGBEncoding; t.minFilter=THREE.LinearFilter; });
+const descentBgTex  = texLoader.load('hisyochi2.jpg', (t)=>{ t.encoding=THREE.sRGBEncoding; t.minFilter=THREE.LinearFilter; });
 
 // ---- モヤ粒子（STREETでは非表示） ----
 const motes = makeMotes(260); scene.add(motes);
@@ -427,7 +427,7 @@ function onPD(e){
   tsX = t.clientX; tsY = t.clientY; t0 = performance.now();
 }
 function onPU(e, origin){
-  if(e.cancelable) e.preventDefault();
+   if(e.cancelable) e.preventDefault(); 
   // ボタン由来はここでは処理しない
   if(isFromButton(e)) return;
 
@@ -511,7 +511,7 @@ function doorCold(){
 }
 // HIGHLAND（昼）：写真のみ
 function toHighland(){
-  setLog('高原（昼）：写真背景 hisyochi.png');
+  setLog('高原（昼）：写真背景 hisyochi.jpg');
   scene.background = highlandBgTex; scene.fog.density = 0.0;
 
   ground.visible = false; motes.visible = false;
@@ -524,7 +524,7 @@ function toHighland(){
 }
 // NIGHT：写真のみ
 function toNight(){
-  setLog('高原（夜）：写真背景 hisyochi1.png');
+  setLog('高原（夜）：写真背景 hisyochi1.jpg');
   scene.background = nightBgTex; scene.fog.density = 0.0;
 
   ground.visible = false; motes.visible = false;
@@ -537,7 +537,7 @@ function toNight(){
 }
 // DESCENT：写真＋吹雪（地面なし）
 function descentColdNoPhoto(){
-  setLog('地獄の寒気：写真（hisyochi2.png）＋吹雪');
+  setLog('地獄の寒気：写真（hisyochi2.jpg）＋吹雪');
   scene.background = descentBgTex;
   scene.fog.color.set(0x0a0f14); scene.fog.density = 0.04;
 
