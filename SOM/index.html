@@ -3,95 +3,77 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>O.B.I.T. — ノベル＋ワープ＆軌道カメラ＆HUD（Prev/Next＋異星語CANVAS）</title>
+<title>O.B.I.T. — ノベル（Three.js＋HUD）</title>
 <style>
-  html, body { margin: 0; height: 100%; background: #000; color: #fff;
+  html, body { margin:0; height:100%; background:#000; color:#fff;
     font-family: system-ui, -apple-system, "Hiragino Kaku Gothic ProN", "Yu Gothic", monospace; }
-  #app { position: relative; height: 100%; overflow: hidden; }
-  canvas { display: block; }
+  #app{ position:relative; height:100%; overflow:hidden; }
+  canvas{ display:block; }
 
-  /* Three.js（宇宙） / 画像背景（地上） */
-  #threeLayer { position: absolute; inset:0; }
-  #imageLayer { position:absolute; inset:0; display:none; background:#000 center/cover no-repeat; }
-  #imageLayer::after { content:""; position:absolute; inset:0;
-    background: radial-gradient(ellipse at 50% 120%, rgba(0,0,0,.0), rgba(0,0,0,.55) 60%, rgba(0,0,0,.9) 100%); }
+  /* Three（宇宙） / 画像（地上） */
+  #threeLayer{ position:absolute; inset:0; }
+  #imageLayer{ position:absolute; inset:0; display:none; background:#000 center/cover no-repeat; }
+  #imageLayer::after{ content:""; position:absolute; inset:0;
+    background: radial-gradient(ellipse at 50% 120%, rgba(0,0,0,0), rgba(0,0,0,.55) 60%, rgba(0,0,0,.9) 100%); }
 
-  /* ノベルUI（下部） */
-  .panel { position:absolute; left:0; right:0; bottom:0; padding:18px 16px 24px;
-    background:linear-gradient(180deg,#0000,#0006 40%,#0009);
-    z-index:10; }
-  .textbox {
-    max-width:min(980px,92vw); margin:0 auto; padding:14px 18px;
+  /* ノベルUI */
+  .panel{ position:absolute; left:0; right:0; bottom:0; padding:18px 16px 24px;
+    background:linear-gradient(180deg,#0000,#0006 40%,#0009); z-index:10; }
+  .textbox{ max-width:min(980px,92vw); margin:0 auto; padding:14px 18px;
     border:1px solid rgba(255,255,255,.16); border-radius:14px;
     background:rgba(11,13,18,.35); backdrop-filter: blur(8px);
-    box-shadow:0 8px 24px rgba(0,0,0,.25);
-    font-size:16px; line-height:1.9;
-    display:grid; grid-template-rows: 1.4em auto auto; row-gap:10px; align-items:start;
-  }
+    box-shadow:0 8px 24px rgba(0,0,0,.25); font-size:16px; line-height:1.9;
+    display:grid; grid-template-rows: 1.4em auto auto; row-gap:10px; align-items:start; }
   .speaker{ opacity:.85; font-size:13px; line-height:1.4em; min-height:1.4em; }
   #text{ white-space:pre-wrap; word-break:break-word; }
   .controls{ display:flex; gap:14px; justify-content:flex-end; }
-  .btn{
-    pointer-events:auto; border:1px solid #2a2a2a; background:#101318;
-    padding:14px 22px; border-radius:14px; color:#fff;
-    font-weight:700; letter-spacing:.02em; cursor:pointer; transition:.18s;
-    font-size:18px; min-height:48px;
-  }
+  .btn{ border:1px solid #2a2a2a; background:#101318; padding:14px 22px; border-radius:14px; color:#fff;
+    font-weight:700; letter-spacing:.02em; cursor:pointer; transition:.18s; font-size:18px; min-height:48px; }
   .btn:hover{ transform:translateY(-1px); box-shadow:0 6px 16px #0006; }
 
-  /* HUD（アラート等） */
-  #hud { position:absolute; inset:0; z-index:8; pointer-events:none; }
-
-  /* 通信（異星語の可視化） */
-  #comm { position:absolute; inset:8% 8% auto 8%; height:28%;
+  /* HUD / 通信 */
+  #hud{ position:absolute; inset:0; z-index:8; pointer-events:none; }
+  #comm{ position:absolute; inset:8% 8% auto 8%; height:28%;
     border:1px solid rgba(0,255,200,.35); border-radius:12px; background: rgba(0,30,30,.55);
     display:none; overflow:hidden; backdrop-filter: blur(2px); z-index:9; }
-  #commCanvas { width:100%; height:60%; display:block;
+  #commCanvas{ width:100%; height:60%; display:block;
     background: repeating-linear-gradient(0deg, rgba(0,255,200,.08), rgba(0,255,200,.08) 2px, rgba(0,0,0,0) 2px, rgba(0,0,0,0) 4px); }
-  #commText { padding:6px 10px; font-family: ui-monospace, Menlo, Consolas, "Liberation Mono", monospace;
+  #commText{ padding:6px 10px; font-family: ui-monospace, Menlo, Consolas, "Liberation Mono", monospace;
     font-size:13px; color:#b9ffe9; text-shadow:0 0 6px rgba(0,255,200,.6); white-space:pre-wrap; line-height:1.5; }
 
   /* フラッシュ */
-  .flash { position:absolute; inset:0; background: radial-gradient(closest-side, rgba(255,255,255,.85), rgba(255,255,255,0) 65%);
-           opacity:0; pointer-events:none; transition:opacity 180ms ease; z-index:9; }
-  .flash.on { opacity:1; }
+  .flash{ position:absolute; inset:0; background: radial-gradient(closest-side, rgba(255,255,255,.85), rgba(255,255,255,0) 65%);
+    opacity:0; pointer-events:none; transition:opacity 180ms ease; z-index:9; }
+  .flash.on{ opacity:1; }
 
-  /* 上部ミニUI（任意） */
-  .ui { position: absolute; inset:12px 12px auto 12px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;
-        background: rgba(0,0,0,.32); border:1px solid rgba(255,255,255,.12); border-radius:12px; padding:6px 10px; backdrop-filter: blur(4px); font-size:12px; z-index:10;}
-  .chip { padding:3px 8px; border:1px solid rgba(255,255,255,.2); border-radius:999px; opacity:.9; }
+  /* ミニUI */
+  .ui{ position:absolute; inset:12px 12px auto 12px; display:flex; gap:10px; align-items:center;
+    background: rgba(0,0,0,.32); border:1px solid rgba(255,255,255,.12); border-radius:12px; padding:6px 10px; font-size:12px; z-index:10; }
+  .chip{ padding:3px 8px; border:1px solid rgba(255,255,255,.2); border-radius:999px; opacity:.9; }
 </style>
 
-<!-- Three.js -->
+<!-- Three.js（※1回だけ） -->
 <script src="https://cdn.jsdelivr.net/npm/three@0.146.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.146.0/examples/js/controls/OrbitControls.js"></script>
 </head>
 <body>
 <div id="app">
-  <!-- 宇宙（Three.js） -->
   <div id="threeLayer"></div>
-  <!-- 地上（任意画像） -->
   <div id="imageLayer"></div>
 
-  <!-- 通信（異星語のみ可視化） -->
   <div id="comm">
     <canvas id="commCanvas"></canvas>
     <div id="commText"></div>
   </div>
 
-  <!-- HUD（アラート等） -->
   <canvas id="hud" width="1920" height="1080"></canvas>
-
-  <!-- フラッシュ -->
   <div class="flash" id="fxFlash"></div>
 
-  <!-- ちょいUI（任意の手動切替） -->
   <div class="ui">
     <span class="chip" id="sceneChip">Scene: --</span>
     <button class="btn" id="btnRecenter">視点リセット</button>
   </div>
 
-  <!-- ノベルUI（Prev/Next） -->
   <div class="panel">
     <div class="textbox" id="novelBox">
       <div class="speaker" id="name"></div>
@@ -105,12 +87,27 @@
 </div>
 
 <script>
-/* ========= 背景（地上用） ========= */
-const imageLayer = document.getElementById('imageLayer');
+/* ========= DOM参照（1回だけ） ========= */
+const threeLayer   = document.getElementById('threeLayer');
+const imageLayer   = document.getElementById('imageLayer');
+const commBox      = document.getElementById('comm');
+const commCanvas   = document.getElementById('commCanvas');
+const commText     = document.getElementById('commText');
+const hud          = document.getElementById('hud');
+const hctx         = hud.getContext('2d');
+const elFlash      = document.getElementById('fxFlash');
+const sceneChip    = document.getElementById('sceneChip');
+const btnRecenter  = document.getElementById('btnRecenter');
+const elBox        = document.getElementById('novelBox');
+const elName       = document.getElementById('name');
+const elText       = document.getElementById('text');
+const prevBtn      = document.getElementById('prevBtn');
+const nextBtn      = document.getElementById('nextBtn');
+
+/* ========= 画像背景 ========= */
 function setCenterBG(url){ imageLayer.style.backgroundImage = `url("${url}")`; }
 
-/* ========= Three.js（宇宙シーン） ========= */
-const threeLayer = document.getElementById('threeLayer');
+/* ========= Three.js ========= */
 const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -118,7 +115,7 @@ threeLayer.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(55, window.innerWidth/window.innerHeight, 0.1, 4000);
-camera.position.set(0, 0, 12); // 初期遠目 → ワープで寄せる
+camera.position.set(0, 0, 12);
 
 const controls = new THREE.OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true; controls.dampingFactor = 0.06; controls.minDistance = 3.2; controls.maxDistance = 60;
@@ -155,7 +152,7 @@ const atmosphere = new THREE.Mesh(new THREE.SphereGeometry(R*1.02, 64, 64),
   new THREE.MeshBasicMaterial({ color:0x4aa3ff, transparent:true, opacity:0.12, blending:THREE.AdditiveBlending, side:THREE.BackSide, depthWrite:false })
 ); scene.add(atmosphere);
 
-/* 星（背景） */
+/* 星のみ（星条） */
 const starGeo = new THREE.BufferGeometry();
 const STAR_N = 2000, starPos = new Float32Array(STAR_N*3);
 for (let i=0;i<STAR_N;i++){
@@ -203,18 +200,23 @@ function applyScene(line){
   sceneChip.textContent = "Scene: " + line.scene + (line.bg ? ` (${line.bg})` : "");
 }
 
-/* ========= HUD（アラート） ========= */
-const hud = document.getElementById('hud');
-const hctx = hud.getContext('2d');
+/* ========= HUD（アラート/ワープ） ========= */
 function resizeHUD(){ hud.width = innerWidth; hud.height = innerHeight; }
 resizeHUD();
+
 function roundRect(ctx,x,y,w,h,r,fill,stroke){
   if(r>w/2)r=w/2; if(r>h/2)r=h/2; ctx.beginPath();
   ctx.moveTo(x+r,y); ctx.arcTo(x+w,y, x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
   ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); if(fill)ctx.fill(); if(stroke)ctx.stroke();
 }
-function wrapText(ctx,text,x,y,maxW,lineH){ const words=text.split(/(\s+)/); let line=''; for(let n=0;n<words.length;n++){ const t=line+words[n], w=ctx.measureText(t).width;
-  if(w>maxW && n>0){ ctx.fillText(line,x,y); line=words[n]; y+=lineH; } else line=t; } ctx.fillText(line,x,y); }
+function wrapText(ctx,text,x,y,maxW,lineH){
+  const words=text.split(/(\s+)/); let line='';
+  for(let n=0;n<words.length;n++){
+    const t=line+words[n], w=ctx.measureText(t).width;
+    if(w>maxW && n>0){ ctx.fillText(line,x,y); line=words[n]; y+=lineH; } else line=t;
+  }
+  ctx.fillText(line,x,y);
+}
 function showAlert(text){
   const W=hud.width, H=hud.height; const boxW=Math.min(W*0.86,720), boxH=90, x=(W-boxW)/2, y=30;
   let a=0, phase='in', start=performance.now(); const hold=900, fade=260;
@@ -232,13 +234,20 @@ function showAlert(text){
     hctx.restore(); requestAnimationFrame(draw);
   })(performance.now());
 }
+function starStreaks(total=600){
+  const W=hud.width, H=hud.height; const lines=[];
+  for(let i=0;i<40;i++) lines.push({x:Math.random()*W,y:Math.random()*H,len:120+Math.random()*240,w:1+Math.random()*3,a:1,vx:(Math.random()-.5)*2,vy:(Math.random()-.5)*2});
+  let t=0; (function tick(){
+    t+=16; hctx.clearRect(0,0,W,H); hctx.save(); hctx.globalCompositeOperation='lighter';
+    for(const L of lines){ hctx.globalAlpha=L.a; hctx.strokeStyle='#bcd3ff'; hctx.lineWidth=L.w; hctx.beginPath(); hctx.moveTo(L.x,L.y); hctx.lineTo(L.x+L.len*0.9,L.y); hctx.stroke();
+      L.x+=L.vx*8; L.y+=L.vy*4; L.a*=0.96; }
+    hctx.restore(); if(t<total) requestAnimationFrame(tick); else hctx.clearRect(0,0,W,H);
+  })();
+}
 
-/* ========= 通信（異星語） ========= */
-const commBox = document.getElementById('comm');
-const commCanvas = document.getElementById('commCanvas');
-const commText = document.getElementById('commText');
+/* ========= 通信（異星語のみ可視化） ========= */
 const cctx = commCanvas.getContext('2d');
-let commOn=false, commRAF=null;
+let commOn=false, commRAF=null, audioCtx=null, beepOsc=null, beepGain=null, beepTimer=null;
 function sizeComm(){ commCanvas.width = commBox.clientWidth; commCanvas.height = Math.floor(commBox.clientHeight*0.6); }
 sizeComm();
 function drawComm(){
@@ -255,7 +264,6 @@ function drawComm(){
   for(let i=0;i<60;i++){ cctx.fillStyle='rgba(120,255,220,0.22)'; cctx.fillRect(Math.random()*w, Math.random()*h, 1,1); }
   commRAF = requestAnimationFrame(drawComm);
 }
-let audioCtx=null, beepOsc=null, beepGain=null, beepTimer=null;
 function audioInit(){ if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)(); }
 function beepStart(){ audioInit(); beepOsc=audioCtx.createOscillator(); beepGain=audioCtx.createGain();
   beepOsc.type='triangle'; beepOsc.frequency.value=980; beepGain.gain.value=0.0001;
@@ -264,17 +272,13 @@ function beepStart(){ audioInit(); beepOsc=audioCtx.createOscillator(); beepGain
     beepOsc.frequency.setTargetAtTime(780+Math.random()*620,audioCtx.currentTime,0.03); }, 90);
 }
 function beepStop(){ if(beepTimer)clearInterval(beepTimer); beepTimer=null; try{beepOsc&&beepOsc.stop()}catch{}; beepGain&&beepGain.disconnect(); beepOsc&&beepOsc.disconnect(); beepOsc=beepGain=null; }
-function commShow(text){ // textは異星語のみを流す
-  commText.textContent = text || "";
-  if(!commOn){ commOn=true; commBox.style.display='block'; drawComm(); beepStart(); }
-}
+function commShow(text){ commText.textContent = text || ""; if(!commOn){ commOn=true; commBox.style.display='block'; drawComm(); beepStart(); } }
 function commHide(){ commOn=false; commBox.style.display='none'; if(commRAF)cancelAnimationFrame(commRAF); commRAF=null; beepStop(); }
 
 /* ========= フラッシュ ========= */
-const elFlash = document.getElementById('fxFlash');
 function flash(){ elFlash.classList.add('on'); setTimeout(()=>elFlash.classList.remove('on'), 160); }
 
-/* ========= カメラ制御（球座標）＆ワープ ========= */
+/* ========= カメラ/Tween ========= */
 function easeInOutQuad(t){ return t<0.5 ? 2*t*t : -1+(4-2*t)*t; }
 function tween(from,to,dur,onUpdate,onDone,ease=easeInOutQuad){
   const start = performance.now();
@@ -305,32 +309,13 @@ function warp(){
     tween(85,55,340,(v)=>{ camera.fov=v; camera.updateProjectionMatrix(); });
   });
 }
-function starStreaks(total=600){
-  const W=hud.width, H=hud.height; const lines=[];
-  for(let i=0;i<40;i++) lines.push({x:Math.random()*W,y:Math.random()*H,len:120+Math.random()*240,w:1+Math.random()*3,a:1,vx:(Math.random()-.5)*2,vy:(Math.random()-.5)*2});
-  let t=0; (function tick(){
-    t+=16; hctx.clearRect(0,0,W,H); hctx.save(); hctx.globalCompositeOperation='lighter';
-    for(const L of lines){ hctx.globalAlpha=L.a; hctx.strokeStyle='#bcd3ff'; hctx.lineWidth=L.w; hctx.beginPath(); hctx.moveTo(L.x,L.y); hctx.lineTo(L.x+L.len*0.9,L.y); hctx.stroke();
-      L.x+=L.vx*8; L.y+=L.vy*4; L.a*=0.96; }
-    hctx.restore(); if(t<total) requestAnimationFrame(tick); else hctx.clearRect(0,0,W,H);
-  })();
-}
-
-/* ========= ノベルUI ========= */
-const elName = document.getElementById('name');
-const elText = document.getElementById('text');
-const elBox  = document.getElementById('novelBox');
-const prevBtn= document.getElementById('prevBtn');
-const nextBtn= document.getElementById('nextBtn');
-const sceneChip=document.getElementById('sceneChip');
-const btnRecenter=document.getElementById('btnRecenter');
 
 /* ========= スクリプト ========= */
 const SCRIPT = [
+  // 星だけの暗転宇宙
   { scene:"stars", t:"銀河で最も賑わう首都星から、数万光年も離れた片隅の星《地球》。" },
-  { scene:"space", t:"その軌道を回る人工衛星のそばに、母星最大級の宇宙船が、超光速回廊ワープから吐き出されるように、忽然と姿を現した。",
-    fx:"warp", cam:{ radius:R+6.8, lat:8, lon:25 } },
-
+  { scene:"space", t:"その軌道を回る人工衛星のそばに、母星最大級の宇宙船が、超光速回廊ワープから吐き出されるように、忽然と姿を現した。", fx:"warp", cam:{ radius:R+6.8, lat:8, lon:25 } },
+  // A-B（カメラ固定：指定なし）
   { t:"　操縦席には、一体の宇宙人が腰を下ろしていた。" },
   { t:"　彼は母星Keplerケプラーにおいて、十万年を生き抜いたとはいえ、まだ“若者”にすぎなかった。" },
   { t:"　父親は星籍登録官サーベイヤーとしての役目を果たし終え、ほどなくして神の元へと召された。遺産に残されたのは、登録だけされ放置された辺境の惑星だった。" },
@@ -342,14 +327,17 @@ const SCRIPT = [
   { t:"　その手は、惑星破砕兵器のスイッチへ向かった。" },
   { t:"　だが押す前に「銀河交易規定星間ルール」を一応満たすため、形式的な信号を発信した――。", fx:"flash" },
 
+  // 真っ黒
   { scene:"black", t:"　ーーそのころ、地球の衛星運用センター。" },
 
+  // A→B は center.png
   { scene:"center", bg:"center.png", t:"　夜勤に入っていた疲れ気味の新人研究員が、あくびをかみ殺していた。" },
   { t:"　机には片付け忘れたラーメン容器と冷めたコーヒー。人工衛星に組み込まれた新型防衛AIのテスト稼働を監視しながら、重たいまぶたをこすっていた。" },
   { t:"　AIの名はO.B.I.T.オービット（Orbital Behavior Intercept & Termination）軌道行動傍受・無力化システム。" },
   { t:"　宇宙空間を通過する弾道飛翔体を捕捉し、危険とみなすと、無力化計画（Trajectory Planning：迎撃軌道を計算して行動する仕組み）を自律的に立案・実行する。" },
   { t:"　テスト開始以来、大きな問題は一度もなく、今日も無事に終わるはず――そう思い込んでいたため、センターには気の緩んだ空気が漂っていた。" },
 
+  // C→D は center1.png
   { scene:"center", bg:"center1.png", t:"《未識別軌道体接近：脅威レベルHigh》", fx:"alert" },
   { t:"　すぐ近くの宙域から発せられた微弱な電波をとらえ、O.B.I.T.が作動した。" },
   { t:"物体検知オブジェクト・ディテクションシステムが反応し、アラートを鳴らしたのだ。" },
@@ -359,6 +347,7 @@ const SCRIPT = [
   { t:"　さらに、ディープラーニング特有の「説明不可能性ブラックボックス」によって、人類が知るよしもなかったが、“異星語ケプラー語”を話せる状態にあったのだ" },
   { t:"　O.B.I.T.は、人類文明が保有する兵器体系では対処不能と見抜くとすぐに、偽装した銀河管理局の公式メッセージを送信した。" },
 
+  // 宇宙3Dに戻す＋通信ON（異星語のみCANVAS表示）→和訳は本文に
   { scene:"space", fx:"comm_on",
     commText:"[LINK-UP] ∴∵‥ SIGNAL SYNC ... OK\n[PROTO] KEPLERIAN / CONTROL-PLANE / HANDSHAKE\n[ENC] QPSK/LDPC ... LOCK\n[NOTE] TRANSLATION LAYER BOOTSTRAP ..." },
   { fx:"comm",
@@ -371,6 +360,7 @@ const SCRIPT = [
 
   { fx:"comm_off" },
 
+  // センターへ戻る
   { scene:"center", t:"　研究員はコーヒーをすすりながらモニターを眺めた。" },
   { t:"　画面には「Ϟ≒ΔЖ∷⋈Ω∵†Ψ…」という出鱈目な通信ログが残っている。" },
   { t:"　レーダー記録トラックに残っていたのは、直径数センチ級の隕石片と思われるエコーにすぎなかった。大気圏に突入すれば、摩擦熱で燃え尽きて消える程度のものだ。" },
@@ -378,19 +368,19 @@ const SCRIPT = [
   { t:"　研究員は、誤検知偽陽性として片付けた。" }
 ];
 
-/* ========= ノベル進行 ========= */
+/* ========= 進行 ========= */
 let idx=0;
 function setName(name){ elName.textContent = name ? name : ""; elName.style.visibility = name ? "visible" : "hidden"; }
 function doFX(line){
   if(line.fx === 'flash') flash();
-  if(line.fx === 'warp'){ warp(); }
+  if(line.fx === 'warp'){ starStreaks(700); const f0=camera.fov; tween(f0,85,260,(v)=>{ camera.fov=v; camera.updateProjectionMatrix(); }, ()=> { tween(85,55,340,(v)=>{ camera.fov=v; camera.updateProjectionMatrix(); }); }); }
   if(line.fx === 'alert'){ const txt = line.t.replace(/^[《]/,'').replace(/[》]$/,''); showAlert(txt); }
   if(line.fx === 'comm_on'){ commShow(line.commText||""); }
   if(line.fx === 'comm'){ if(line.commText) commShow(line.commText); }
   if(line.fx === 'comm_off'){ commHide(); }
 }
 function applyCam(line){
-  if(!line.cam) return; // A→B / C→D は cam を付けない＝カメラ固定
+  if(!line.cam) return; // A→B などは cam を付けない＝カメラ固定
   const { radius, lat=10, lon=0 } = line.cam;
   moveCameraTo(radius, lat, lon, 900);
 }
@@ -429,7 +419,7 @@ function animate(){
 }
 animate();
 
-/* ========= スタート ========= */
+/* ========= start ========= */
 (function resetStory(){ idx=0; showLine(idx); })();
 </script>
 </body>
